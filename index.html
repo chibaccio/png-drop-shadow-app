@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; img-src 'self' data: blob:; object-src 'none'; base-uri 'self';">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>PNG Drop Shadow Studio | 背景透過PNGドロップシャドウ生成</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --border-color: #334155;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --accent: #10b981;
+      --accent-hover: #059669;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 1rem 2rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(8px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+
+    .brand span {
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      background-color: var(--border-color);
+      color: var(--text-sub);
+    }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      height: calc(100vh - 65px);
+    }
+
+    @media (max-width: 880px) {
+      main {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+    }
+
+    /* サイドバー */
+    .sidebar {
+      background-color: var(--card-bg);
+      border-right: 1px solid var(--border-color);
+      padding: 1.5rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* アップロードエリア */
+    .dropzone {
+      border: 2px dashed var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background-color: rgba(15, 23, 42, 0.4);
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary);
+      background-color: rgba(59, 130, 246, 0.08);
+    }
+
+    .dropzone p {
+      font-size: 0.875rem;
+      color: var(--text-sub);
+      margin-top: 0.5rem;
+    }
+
+    .dropzone .icon {
+      font-size: 1.75rem;
+    }
+
+    /* プリセット */
+    .section-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-sub);
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+    }
+
+    .presets {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.5rem;
+    }
+
+    .preset-btn {
+      background-color: #0f172a;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.5rem 0.6rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .preset-btn:hover {
+      border-color: var(--primary);
+      background-color: #1e293b;
+    }
+
+    /* スライダー群 */
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 1.1rem;
+    }
+
+    .control-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.875rem;
+    }
+
+    .control-value {
+      color: #60a5fa;
+      font-family: monospace;
+      font-size: 0.875rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    .color-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    input[type="color"] {
+      appearance: none;
+      -webkit-appearance: none;
+      border: 1px solid var(--border-color);
+      width: 44px;
+      height: 28px;
+      border-radius: 6px;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+    input[type="color"]::-webkit-color-swatch {
+      border: none;
+      border-radius: 5px;
+    }
+
+    /* トグルスイッチ */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.875rem;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 42px;
+      height: 24px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #334155;
+      transition: .2s;
+      border-radius: 24px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--primary);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(18px);
+    }
+
+    /* ダウンロードボタン */
+    .download-btn {
+      background-color: var(--accent);
+      color: #ffffff;
+      border: none;
+      padding: 0.85rem 1rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: background-color 0.2s ease, transform 0.1s ease;
+      margin-top: auto;
+    }
+
+    .download-btn:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+    }
+
+    .download-btn:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    .download-btn:disabled {
+      background-color: #334155;
+      color: #64748b;
+      cursor: not-allowed;
+    }
+
+    /* プレビューエリア */
+    .preview-container {
+      background-color: #0b1120;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .preview-toolbar {
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: rgba(15, 23, 42, 0.6);
+      z-index: 10;
+    }
+
+    .bg-switcher {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .bg-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    .bg-dot:hover {
+      transform: scale(1.15);
+    }
+
+    .bg-dot.active {
+      outline: 2px solid var(--primary);
+      outline-offset: 1px;
+    }
+
+    .bg-checker {
+      background-image: linear-gradient(45deg, #2a3447 25%, transparent 25%), 
+                        linear-gradient(-45deg, #2a3447 25%, transparent 25%), 
+                        linear-gradient(45deg, transparent 75%, #2a3447 75%), 
+                        linear-gradient(-45deg, transparent 75%, #2a3447 75%);
+      background-size: 10px 10px;
+      background-position: 0 0, 0 5px, 5px -5px, -5px 0px;
+      background-color: #1e293b;
+    }
+
+    .bg-white { background-color: #ffffff; }
+    .bg-black { background-color: #000000; }
+    .bg-gray { background-color: #64748b; }
+
+    .img-meta {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      font-family: monospace;
+    }
+
+    .preview-viewport {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      overflow: auto;
+    }
+
+    .viewport-canvas-wrapper {
+      max-width: 90%;
+      max-height: 85%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+      overflow: hidden;
+      transition: background 0.2s ease;
+    }
+
+    canvas {
+      max-width: 100%;
+      max-height: 70vh;
+      object-fit: contain;
+      display: block;
+    }
+
+    .placeholder-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      color: var(--text-sub);
+    }
+
+    .placeholder-state svg {
+      width: 64px;
+      height: 64px;
+      stroke: #475569;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div style="font-size: 1.5rem;">🪄</div>
+      <div>
+        <h1>PNG <span>Drop Shadow</span> Studio</h1>
+      </div>
+      <span class="badge">Pure Client-Side / Secure</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- サイドバー -->
+    <aside class="sidebar">
+      <!-- アップロード -->
+      <div class="dropzone" id="dropzone">
+        <div class="icon">📁</div>
+        <strong>透過PNG画像をアップロード</strong>
+        <p>ドラッグ＆ドロップ または クリックして選択<br><span style="font-size:0.75rem; opacity:0.8;">(クリップボードからの貼り付け Ctrl+V にも対応)</span></p>
+        <input type="file" id="fileInput" accept="image/png,image/webp" style="display: none;">
+      </div>
+
+      <!-- プリセット -->
+      <div>
+        <div class="section-title">クイックプリセット</div>
+        <div class="presets">
+          <button class="preset-btn" onclick="applyPreset('soft')">✨ 薄め・ボケ強め</button>
+          <button class="preset-btn" onclick="applyPreset('natural')">🍃 ナチュラル</button>
+          <button class="preset-btn" onclick="applyPreset('float')">🎈 浮遊感 (下方向)</button>
+          <button class="preset-btn" onclick="applyPreset('glow')">💡 光彩 (グロー)</button>
+        </div>
+      </div>
+
+      <!-- パラメータ調整 -->
+      <div class="control-group">
+        <div class="section-title">シャドウ設定</div>
+
+        <!-- ボケ具合 -->
+        <div class="control-item">
+          <div class="control-label">
+            <span>ボケ具合 (Blur)</span>
+            <span class="control-value" id="blurVal">30 px</span>
+          </div>
+          <input type="range" id="blurInput" min="0" max="100" value="30">
+        </div>
+
+        <!-- 濃さ（不透明度） -->
+        <div class="control-item">
+          <div class="control-label">
+            <span>シャドウの濃さ (Opacity)</span>
+            <span class="control-value" id="opacityVal">25 %</span>
+          </div>
+          <input type="range" id="opacityInput" min="0" max="100" value="25">
+        </div>
+
+        <!-- 位置 X -->
+        <div class="control-item">
+          <div class="control-label">
+            <span>位置 X (水平オフセット)</span>
+            <span class="control-value" id="offsetXVal">10 px</span>
+          </div>
+          <input type="range" id="offsetXInput" min="-80" max="80" value="10">
+        </div>
+
+        <!-- 位置 Y -->
+        <div class="control-item">
+          <div class="control-label">
+            <span>位置 Y (垂直オフセット)</span>
+            <span class="control-value" id="offsetYVal">15 px</span>
+          </div>
+          <input type="range" id="offsetYInput" min="-80" max="80" value="15">
+        </div>
+
+        <!-- 影の色 -->
+        <div class="control-item color-row">
+          <span style="font-size: 0.875rem;">影の色 (Color)</span>
+          <input type="color" id="colorInput" value="#000000">
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-color);">
+
+        <!-- 余白の自動拡張 -->
+        <div class="toggle-row">
+          <div>
+            <div>余白（パディング）自動追加</div>
+            <div style="font-size: 0.75rem; color: var(--text-sub);">影の見切れを防ぐためキャンバスを拡張</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="autoPaddingInput" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- ダウンロードボタン -->
+      <button class="download-btn" id="downloadBtn" disabled>
+        <span>⬇️</span> 透過PNGをダウンロード
+      </button>
+    </aside>
+
+    <!-- プレビューエリア -->
+    <section class="preview-container">
+      <div class="preview-toolbar">
+        <div class="bg-switcher">
+          <span style="font-size: 0.8rem; color: var(--text-sub); margin-right: 0.4rem;">背景色:</span>
+          <div class="bg-dot bg-checker active" data-bg="checker" title="透過市松模様"></div>
+          <div class="bg-dot bg-white" data-bg="white" title="白背景"></div>
+          <div class="bg-dot bg-gray" data-bg="gray" title="グレー背景"></div>
+          <div class="bg-dot bg-black" data-bg="black" title="黒背景"></div>
+        </div>
+        <div class="img-meta" id="imgMeta">画像未読込</div>
+      </div>
+
+      <div class="preview-viewport" id="viewport">
+        <div class="viewport-canvas-wrapper bg-checker" id="canvasWrapper">
+          <div class="placeholder-state" id="placeholder">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+            </svg>
+            <p>透過PNG画像をドロップするとプレビューが表示されます</p>
+          </div>
+          <canvas id="canvas" style="display: none;"></canvas>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // State
+    let currentImage = null;
+    let fileName = "shadowed_image.png";
+
+    // DOM Elements
+    const dropzone = document.getElementById("dropzone");
+    const fileInput = document.getElementById("fileInput");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const placeholder = document.getElementById("placeholder");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const imgMeta = document.getElementById("imgMeta");
+    const canvasWrapper = document.getElementById("canvasWrapper");
+
+    // Controls
+    const blurInput = document.getElementById("blurInput");
+    const opacityInput = document.getElementById("opacityInput");
+    const offsetXInput = document.getElementById("offsetXInput");
+    const offsetYInput = document.getElementById("offsetYInput");
+    const colorInput = document.getElementById("colorInput");
+    const autoPaddingInput = document.getElementById("autoPaddingInput");
+
+    const blurVal = document.getElementById("blurVal");
+    const opacityVal = document.getElementById("opacityVal");
+    const offsetXVal = document.getElementById("offsetXVal");
+    const offsetYVal = document.getElementById("offsetYVal");
+
+    // Event Listeners for inputs
+    [blurInput, opacityInput, offsetXInput, offsetYInput, colorInput, autoPaddingInput].forEach(el => {
+      el.addEventListener("input", () => {
+        updateLabels();
+        render();
+      });
+    });
+
+    function updateLabels() {
+      blurVal.textContent = `${blurInput.value} px`;
+      opacityVal.textContent = `${opacityInput.value} %`;
+      offsetXVal.textContent = `${offsetXInput.value} px`;
+      offsetYVal.textContent = `${offsetYInput.value} px`;
+    }
+
+    // Presets
+    const PRESETS = {
+      soft: { blur: 35, opacity: 25, x: 10, y: 15, color: "#000000" },
+      natural: { blur: 20, opacity: 35, x: 6, y: 10, color: "#000000" },
+      float: { blur: 45, opacity: 20, x: 0, y: 24, color: "#000000" },
+      glow: { blur: 30, opacity: 40, x: 0, y: 0, color: "#000000" }
+    };
+
+    function applyPreset(key) {
+      const p = PRESETS[key];
+      if (!p) return;
+      blurInput.value = p.blur;
+      opacityInput.value = p.opacity;
+      offsetXInput.value = p.x;
+      offsetYInput.value = p.y;
+      colorInput.value = p.color;
+      updateLabels();
+      render();
+    }
+
+    // Background Switcher
+    document.querySelectorAll(".bg-dot").forEach(dot => {
+      dot.addEventListener("click", () => {
+        document.querySelectorAll(".bg-dot").forEach(d => d.classList.remove("active"));
+        dot.classList.add("active");
+        const type = dot.getAttribute("data-bg");
+        canvasWrapper.className = `viewport-canvas-wrapper bg-${type}`;
+      });
+    });
+
+    // File Drag & Drop
+    dropzone.addEventListener("click", () => fileInput.click());
+    dropzone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropzone.classList.add("dragover");
+    });
+    dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+    dropzone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("dragover");
+      if (e.dataTransfer.files.length > 0) {
+        handleFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    fileInput.addEventListener("change", (e) => {
+      if (e.target.files.length > 0) {
+        handleFile(e.target.files[0]);
+      }
+    });
+
+    // Paste from clipboard
+    window.addEventListener("paste", (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.indexOf("image") !== -1) {
+          const file = item.getAsFile();
+          handleFile(file, "pasted_image.png");
+          break;
+        }
+      }
+    });
+
+    function sanitizeFileName(name) {
+      return name.replace(/[^a-zA-Z0-9_\-\u3040-\u30FF\u4E00-\u9FFF.]/g, "_");
+    }
+
+    function handleFile(file, customName) {
+      if (!file || !file.type.startsWith("image/")) {
+        alert("画像ファイル（PNG推奨）を選択してください。");
+        return;
+      }
+      const rawName = customName || file.name.replace(/\.[^/.]+$/, "") + "_shadow.png";
+      fileName = sanitizeFileName(rawName);
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          if (img.naturalWidth > 16384 || img.naturalHeight > 16384) {
+            alert("画像解像度が大きすぎます（最大16384x16384pxまで）。");
+            return;
+          }
+          currentImage = img;
+          placeholder.style.display = "none";
+          canvas.style.display = "block";
+          downloadBtn.disabled = false;
+          render();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function hexToRgba(hex, alphaPercent) {
+      const r = parseInt(hex.slice(1, 3), 16) || 0;
+      const g = parseInt(hex.slice(3, 5), 16) || 0;
+      const b = parseInt(hex.slice(5, 7), 16) || 0;
+      const a = (alphaPercent / 100).toFixed(3);
+      return `rgba(${r}, ${g}, ${b}, ${a})`;
+    }
+
+    // Core Canvas Render
+    function render() {
+      if (!currentImage) return;
+
+      const blur = parseInt(blurInput.value, 10);
+      const opacity = parseInt(opacityInput.value, 10);
+      const offsetX = parseInt(offsetXInput.value, 10);
+      const offsetY = parseInt(offsetYInput.value, 10);
+      const colorHex = colorInput.value;
+      const autoPad = autoPaddingInput.checked;
+
+      const origW = currentImage.naturalWidth || currentImage.width;
+      const origH = currentImage.naturalHeight || currentImage.height;
+
+      // 余白計算
+      let padX = 0;
+      let padY = 0;
+      if (autoPad) {
+        padX = Math.ceil(blur * 1.6 + Math.abs(offsetX));
+        padY = Math.ceil(blur * 1.6 + Math.abs(offsetY));
+      }
+
+      const targetW = origW + padX * 2;
+      const targetH = origH + padY * 2;
+
+      canvas.width = targetW;
+      canvas.height = targetH;
+
+      ctx.clearRect(0, 0, targetW, targetH);
+
+      // ドロップシャドウの設定
+      ctx.shadowColor = hexToRgba(colorHex, opacity);
+      ctx.shadowBlur = blur;
+      ctx.shadowOffsetX = offsetX;
+      ctx.shadowOffsetY = offsetY;
+
+      // 画像の描画（影が自動的に背後にレンダリングされる）
+      ctx.drawImage(currentImage, padX, padY, origW, origH);
+
+      // 解像度情報の更新
+      imgMeta.textContent = `元: ${origW}×${origH}px → 出力: ${targetW}×${targetH}px`;
+    }
+
+    // Download Handler
+    downloadBtn.addEventListener("click", () => {
+      if (!currentImage) return;
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const link = document.createElement("a");
+        link.download = fileName;
+        const blobUrl = URL.createObjectURL(blob);
+        link.href = blobUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      }, "image/png");
+    });
+  </script>
+</body>
+</html>
